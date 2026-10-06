@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import FeatureViewer from './FeatureViewer';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -7,6 +8,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:800
 
 const MoodDashboard = () => {
   const { token } = useAuth();
+  const location = useLocation();
   const [moodHistory, setMoodHistory] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
@@ -23,6 +25,7 @@ const MoodDashboard = () => {
   const [notes, setNotes] = useState('');
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const moodOptions = [
     { label: 'Very Low', score: 1, emoji: '😢' },
@@ -60,11 +63,25 @@ const MoodDashboard = () => {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // Arriving from the dashboard mood picker: open the entry form with that mood selected
+  useEffect(() => {
+    const score = location.state?.quickMoodScore;
+    const option = moodOptions.find((o) => o.score === score);
+    if (option) {
+      setMood(option.label);
+      setMoodScore(option.score);
+      setShowEntryModal(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const handleMoodSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    setSubmitError('');
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -88,9 +105,13 @@ const MoodDashboard = () => {
         setNotes('');
         await fetchData();
         setTimeout(() => setFeedbackMsg(''), 4000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSubmitError(res.status === 401 ? 'Your session has expired. Please log in again.' : (typeof data.detail === 'string' ? data.detail : `Could not save your entry (error ${res.status}).`));
       }
     } catch (err) {
       console.error("Submit mood error:", err);
+      setSubmitError('Could not reach the server. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -387,6 +408,10 @@ const MoodDashboard = () => {
                   className="w-full border border-gray-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-blue-200 focus:outline-none"
                 />
               </div>
+
+              {submitError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{submitError}</p>
+              )}
 
               <div className="flex justify-end space-x-2 pt-2 border-t">
                 <button

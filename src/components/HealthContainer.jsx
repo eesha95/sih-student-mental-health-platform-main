@@ -1,10 +1,17 @@
 // components/HealthContainer.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+// Dashboard quick-picker values -> score used by the mood tracker (1-5)
+const QUICK_MOOD_SCORES = { excellent: 5, good: 4, neutral: 3, low: 2, struggling: 1 };
+const SCORE_TO_QUICK_MOOD = { 5: 'excellent', 4: 'good', 3: 'neutral', 2: 'low', 1: 'struggling' };
+
 const HealthContainer = () => {
-  const { user, admin } = useAuth();
+  const { user, admin, getDashboardData } = useAuth();
+  const navigate = useNavigate();
   const [currentMood, setCurrentMood] = useState('');
+  const [stats, setStats] = useState(null);
   const [showMoodTracker, setShowMoodTracker] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
@@ -42,9 +49,24 @@ const HealthContainer = () => {
     });
   };
 
+  // Real stats and today's mood from the backend
+  useEffect(() => {
+    if (!user) return;
+    getDashboardData().then((result) => {
+      if (!result.success) return;
+      setStats(result.data.stats);
+      const latest = result.data.latest_mood;
+      if (latest && new Date(latest.created_at + 'Z').toDateString() === new Date().toDateString()) {
+        setCurrentMood(SCORE_TO_QUICK_MOOD[latest.mood_score] || '');
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Picking a mood opens the mood tracker pre-filled, so the entry is actually saved
   const handleMoodSelect = (mood) => {
-    setCurrentMood(mood);
     setShowMoodTracker(false);
+    navigate('/mood-dashboard', { state: { quickMoodScore: QUICK_MOOD_SCORES[mood] } });
   };
 
   const getCurrentMoodData = () => {
@@ -337,10 +359,10 @@ const HealthContainer = () => {
               }`}>
                 <div className={`text-xl font-bold mb-1 ${
                   isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                }`}>7</div>
+                }`}>{stats ? stats.days_active_30d : '–'}</div>
                 <div className={`text-xs font-medium ${
                   isDarkMode ? 'text-slate-300' : 'text-gray-600'
-                }`}>Days Active</div>
+                }`}>Days Active (30d)</div>
               </div>
               <div className={`text-center p-3 rounded-xl backdrop-blur-sm ${
                 isDarkMode
@@ -349,10 +371,10 @@ const HealthContainer = () => {
               }`}>
                 <div className={`text-xl font-bold mb-1 ${
                   isDarkMode ? 'text-green-400' : 'text-green-600'
-                }`}>3</div>
+                }`}>{stats ? stats.checkins_this_week : '–'}</div>
                 <div className={`text-xs font-medium ${
                   isDarkMode ? 'text-slate-300' : 'text-gray-600'
-                }`}>Sessions This Week</div>
+                }`}>Check-ins This Week</div>
               </div>
               <div className={`text-center p-3 rounded-xl backdrop-blur-sm ${
                 isDarkMode
@@ -361,10 +383,12 @@ const HealthContainer = () => {
               }`}>
                 <div className={`text-xl font-bold mb-1 ${
                   isDarkMode ? 'text-purple-400' : 'text-purple-600'
-                }`}>85%</div>
+                }`}>{stats?.latest_wellness_score != null ? `${stats.latest_wellness_score.toFixed(1)}/5` : '–'}</div>
                 <div className={`text-xs font-medium ${
                   isDarkMode ? 'text-slate-300' : 'text-gray-600'
-                }`}>Wellness Score</div>
+                }`}>{stats?.latest_wellness_score != null ? 'Wellness Score' : (
+                  <button onClick={() => navigate('/wellness-check')} className="underline">Take check-in</button>
+                )}</div>
               </div>
             </div>
           </div>
