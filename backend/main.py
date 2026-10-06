@@ -529,7 +529,7 @@ async def root():
 def register_user(user: UserCreate, request: Request, db: Session = Depends(get_db)):
     """Register a new user"""
     ensure_not_in_maintenance(db)
-    existing_user = db.query(UserDB).filter(UserDB.email == user.email).first()
+    existing_user = db.query(UserDB).filter(func.lower(UserDB.email) == user.email.lower()).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -537,7 +537,7 @@ def register_user(user: UserCreate, request: Request, db: Session = Depends(get_
     new_user = UserDB(
         id=str(uuid.uuid4()),
         name=user.name,
-        email=user.email,
+        email=user.email.lower(),
         password_hash=hashed_password
     )
     db.add(new_user)
@@ -557,7 +557,8 @@ def register_user(user: UserCreate, request: Request, db: Session = Depends(get_
 @app.post("/login", response_model=Token)
 def login_user(user: UserLogin, request: Request, db: Session = Depends(get_db)):
     ensure_not_in_maintenance(db)
-    db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
+    # Emails are matched case-insensitively so "Name@Gmail.com" and "name@gmail.com" are the same account
+    db_user = db.query(UserDB).filter(func.lower(UserDB.email) == user.email.lower()).first()
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     
@@ -579,7 +580,7 @@ def login_user(user: UserLogin, request: Request, db: Session = Depends(get_db))
 
 @app.post("/admin/login", response_model=AdminToken)
 def login_admin(admin: AdminLogin, request: Request, db: Session = Depends(get_db)):
-    db_admin = db.query(AdminDB).filter(AdminDB.email == admin.email).first()
+    db_admin = db.query(AdminDB).filter(func.lower(AdminDB.email) == admin.email.lower()).first()
     if not db_admin or not verify_password(admin.password, db_admin.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect admin email or password")
     
