@@ -59,7 +59,7 @@ const searchItems = (query) => {
 };
 
 const Navbar = () => {
-  const { user, logout, apiRequest } = useAuth();
+  const { user, admin, logout, apiRequest } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -132,8 +132,9 @@ const Navbar = () => {
       { path: '/peer-support', label: 'Community', icon: '👥' },
     ];
 
-    if (user?.isAdmin) {
-      return [...commonItems, { path: '/admin-dashboard', label: 'Admin Panel', icon: '⚙️' }];
+    // Admins use a separate login that can't access student features
+    if (admin) {
+      return [{ path: '/admin-dashboard', label: 'Admin Panel', icon: '⚙️' }];
     }
 
     return commonItems;

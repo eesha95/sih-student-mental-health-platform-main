@@ -149,9 +149,15 @@ export const AuthProvider = ({ children }) => {
       console.log(`API response for ${endpoint}:`, { 
         status: response.status, 
         ok: response.ok,
-        statusText: response.statusText 
+        statusText: response.statusText
       });
-      
+
+      // Expired or invalid login: sign out so the route guards send the user back to the login page
+      if (response.status === 401 && token) {
+        logout();
+        throw new Error('Your session has expired. Please log in again.');
+      }
+
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
