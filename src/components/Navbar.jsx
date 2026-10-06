@@ -389,7 +389,7 @@ const Navbar = () => {
                 }`}
               >
                 <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-4.03-4.03A9.95 9.95 0 0018 8c0-5.52-4.48-10-10-10S-2 2.48-2 8a9.95 9.95 0 001.03 4.97L-5 17h5m10 0v1a3 3 0 01-6 0v-1m6 0H9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {unreadCount > 0 && (
                   <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
@@ -481,14 +481,14 @@ const Navbar = () => {
                   isDarkMode ? 'bg-purple-500/20' : 'bg-purple-100'
                 }`}>
                   <span className="text-sm font-bold">
-                    {(user?.name || user?.email || '').charAt(0).toUpperCase()}
+                    {(user?.name || user?.email || admin?.name || admin?.email || '').charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="hidden sm:block text-left">
                   <div className="text-sm font-medium">
-                    {user?.name || user?.email?.split('@')[0]}
+                    {user?.name || user?.email?.split('@')[0] || admin?.name || 'Admin'}
                   </div>
-                  {user?.isAdmin && (
+                  {admin && (
                     <div className={`text-xs ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`}>
                       Administrator
                     </div>
@@ -512,18 +512,19 @@ const Navbar = () => {
                         isDarkMode ? 'bg-purple-500/20' : 'bg-purple-100'
                       }`}>
                         <span className="text-lg font-bold">
-                          {(user?.name || user?.email || '').charAt(0).toUpperCase()}
+                          {(user?.name || user?.email || admin?.name || admin?.email || '').charAt(0).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <div className="font-semibold">{user?.name || user?.email?.split('@')[0]}</div>
+                        <div className="font-semibold">{user?.name || user?.email?.split('@')[0] || admin?.name || 'Admin'}</div>
                         <div className={`text-sm opacity-60 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          {user?.email}
+                          {user?.email || admin?.email}
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
+                      {user && (<>
                       <Link
                         to="/profile"
                         onClick={() => setIsProfileMenuOpen(false)}
@@ -544,7 +545,8 @@ const Navbar = () => {
                         <span>⚙️</span>
                         <span>Preferences</span>
                       </Link>
-                      {user?.isAdmin && (
+                      </>)}
+                      {admin && (
                         <Link
                           to="/admin-dashboard"
                           onClick={() => setIsProfileMenuOpen(false)}

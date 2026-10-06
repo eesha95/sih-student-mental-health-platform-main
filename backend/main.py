@@ -21,7 +21,6 @@ load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel("gemini-flash-latest")
 app = FastAPI(
     title="Student Mental Health API",
     version="1.0.0"
@@ -604,17 +603,56 @@ def read_current_admin(current_admin: AdminDB = Depends(get_current_admin)):
 
 @app.get("/dashboard")
 def get_user_dashboard(current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
-    recent_moods = db.query(MoodRecordDB).filter(MoodRecordDB.user_id == current_user.id).order_by(MoodRecordDB.created_at.desc()).limit(5).all()
-    completed_recs = db.query(RecommendationDB).filter(RecommendationDB.user_id == current_user.id, RecommendationDB.is_completed == True).count()
-    total_chats = db.query(ChatMessageDB).filter(ChatMessageDB.user_id == current_user.id, ChatMessageDB.sender == "user").count()
+    now = datetime.utcnow()
+    month_ago, week_ago = now - timedelta(days=30), now - timedelta(days=7)
+    moods = db.query(MoodRecordDB).filter(MoodRecordDB.user_id == current_user.id, MoodRecordDB.created_at >= month_ago).all()
+    checks = db.query(WellnessCheckDB).filter(WellnessCheckDB.user_id == current_user.id, WellnessCheckDB.created_at >= month_ago).all()
+    chats = db.query(ChatMessageDB.timestamp).filter(ChatMessageDB.user_id == current_user.id, ChatMessageDB.sender == "user",
+                                                     ChatMessageDB.timestamp >= month_ago).all()
+    active_days = {m.created_at.date() for m in moods} | {c.created_at.date() for c in checks} | {c.timestamp.date() for c in chats}
+    latest_check = db.query(WellnessCheckDB).filter(WellnessCheckDB.user_id == current_user.id).order_by(WellnessCheckDB.created_at.desc()).first()
+    latest_mood = db.query(MoodRecordDB).filter(MoodRecordDB.user_id == current_user.id).order_by(MoodRecordDB.created_at.desc()).first()
     return {
         "user": {"id": current_user.id, "name": current_user.name, "email": current_user.email},
         "stats": {
-            "recent_mood_count": len(recent_moods),
-            "completed_recommendations": completed_recs,
-            "total_chat_interactions": total_chats
-        }
+            "recent_mood_count": len(moods),
+            "completed_recommendations": db.query(RecommendationDB).filter(RecommendationDB.user_id == current_user.id, RecommendationDB.is_completed == True).count(),
+            "total_chat_interactions": db.query(ChatMessageDB).filter(ChatMessageDB.user_id == current_user.id, ChatMessageDB.sender == "user").count(),
+            "days_active_30d": len(active_days),
+            "checkins_this_week": sum(1 for m in moods if m.created_at >= week_ago) + sum(1 for c in checks if c.created_at >= week_ago),
+            "latest_wellness_score": latest_check.overall_score / 10 if latest_check else None,
+        },
+        "latest_mood": {"mood": latest_mood.mood, "mood_score": latest_mood.mood_score, "created_at": latest_mood.created_at} if latest_mood else None,
     }
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+class AccountDelete(BaseModel):
+    password: str
+
+@app.post("/me/password")
+def change_password(req: PasswordChange, current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not verify_password(req.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    current_user.password_hash = get_password_hash(req.new_password)
+    db.commit()
+    log_activity(db, current_user.id, current_user.name, "profile_update", "User changed password")
+    return {"message": "Password updated"}
+
+@app.delete("/me")
+def delete_my_account(req: AccountDelete, current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Let a student permanently delete their account and all personal data."""
+    if not verify_password(req.password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Password is incorrect")
+    _delete_user_data(db, current_user.id)
+    db.delete(current_user)
+    db.commit()
+    log_activity(db, None, None, "account_delete", "A student deleted their account")
+    return {"message": "Account deleted"}
 
 @app.put("/profile", response_model=User)
 def update_profile(name: str, request: Request, current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -677,6 +715,16 @@ def get_admin_user_details(user_id: str, current_admin: AdminDB = Depends(get_cu
         "peer_posts": db.query(PeerPostDB).filter(PeerPostDB.user_id == user_id).count(),
     }
 
+def _delete_user_data(db: Session, user_id: str):
+    """Remove every record belonging to a student (used by admin delete and self-service delete)."""
+    post_ids = [p.id for p in db.query(PeerPostDB.id).filter(PeerPostDB.user_id == user_id).all()]
+    if post_ids:
+        for model in (PostLikeDB, PostReplyDB, PostReportDB):
+            db.query(model).filter(model.post_id.in_(post_ids)).delete(synchronize_session=False)
+    for model in (ChatMessageDB, ConversationDB, MoodRecordDB, RecommendationDB, WellnessCheckDB, BookingDB,
+                  GroupMembershipDB, PeerPostDB, PostLikeDB, PostReplyDB, PostReportDB, SessionRegistrationDB, SafetyAuditDB):
+        db.query(model).filter(model.user_id == user_id).delete(synchronize_session=False)
+
 @app.post("/admin/users/{user_id}/activate", response_model=User)
 def activate_user(user_id: str, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
     user = _get_user_or_404(db, user_id)
@@ -698,13 +746,7 @@ def deactivate_user(user_id: str, current_admin: AdminDB = Depends(get_current_a
 @app.delete("/admin/users/{user_id}")
 def delete_user(user_id: str, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
     user = _get_user_or_404(db, user_id)
-    post_ids = [p.id for p in db.query(PeerPostDB.id).filter(PeerPostDB.user_id == user_id).all()]
-    if post_ids:
-        for model in (PostLikeDB, PostReplyDB, PostReportDB):
-            db.query(model).filter(model.post_id.in_(post_ids)).delete(synchronize_session=False)
-    for model in (ChatMessageDB, ConversationDB, MoodRecordDB, RecommendationDB, WellnessCheckDB, BookingDB,
-                  GroupMembershipDB, PeerPostDB, PostLikeDB, PostReplyDB, PostReportDB, SessionRegistrationDB, SafetyAuditDB):
-        db.query(model).filter(model.user_id == user_id).delete(synchronize_session=False)
+    _delete_user_data(db, user_id)
     db.delete(user)
     db.commit()
     log_activity(db, current_admin.id, current_admin.name, "admin_user_delete", f"Admin deleted user {user_id} and their data")
@@ -822,25 +864,38 @@ def analyze_nlp_and_safety(text: str) -> dict:
         "recommended_action": recommended_action
     }
 
+# Fast "lite" models first: larger flash models can take 10-45s to answer, which made chat time out.
+# Free-tier quota is counted per model per day, so falling back across models keeps chat working longer.
+# Override with GEMINI_MODELS="models/a,models/b" in .env.
+GEMINI_MODELS = [m.strip() for m in os.getenv(
+    "GEMINI_MODELS",
+    "models/gemini-flash-lite-latest,models/gemini-3.5-flash-lite,models/gemini-2.5-flash-lite,models/gemini-flash-latest",
+).split(",") if m.strip()]
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "25"))
+
 def _call_gemini(prompt: str) -> Optional[str]:
-    candidate_models = [
-        "models/gemini-3.6-flash",
-        "models/gemini-1.5-flash",
-        "models/gemini-2.0-flash",
-        "models/gemini-flash-latest"
-    ]
-    for model_name in candidate_models:
+    import time
+    deadline = time.monotonic() + GEMINI_TIMEOUT_SECONDS
+    for model_name in GEMINI_MODELS:
+        remaining = deadline - time.monotonic()
+        if remaining < 2:
+            break
         try:
-            m = genai.GenerativeModel(model_name)
-            res = m.generate_content(prompt)
-            if res and hasattr(res, 'text') and res.text:
+            res = genai.GenerativeModel(model_name).generate_content(prompt, request_options={"timeout": remaining})
+            if res and getattr(res, "text", None):
                 return res.text
         except Exception as err:
-            print(f"Model {model_name} API warning: {err}")
-            continue
+            print(f"Gemini model {model_name} failed: {type(err).__name__}: {str(err)[:200]}")
     return None
 
-def generate_ai_response(user_msg: str, nlp_res: dict) -> str:
+def _format_history(history: Optional[List[dict]]) -> str:
+    """Recent turns so the assistant remembers what the student already said."""
+    if not history:
+        return ""
+    lines = [f"{'Student' if h['sender'] == 'user' else 'Assistant'}: {h['text'][:600]}" for h in history]
+    return "Conversation so far (most recent last):\n" + "\n".join(lines) + "\n\n"
+
+def generate_ai_response(user_msg: str, nlp_res: dict, history: Optional[List[dict]] = None) -> str:
     # Safety Check: If CRITICAL or HIGH risk, prioritize safety response
     if nlp_res["risk_level"] in ["CRITICAL", "HIGH"]:
         return (
@@ -865,16 +920,12 @@ Rules:
 - Keep answers conversational, helpful, and naturally structured.
 
 Detected User State: Emotion={nlp_res['emotion']}, Sentiment={nlp_res['sentiment']}, Stress={nlp_res['stress_level']}.
-User message: {user_msg}
+{_format_history(history)}User message: {user_msg}
 """
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_call_gemini, prompt)
-            result = future.result(timeout=12.0)
-            if result and len(result.strip()) > 0:
-                return result.strip()
-    except Exception as e:
-        print(f"Gemini API timeout or error: {e}")
+    # Already running in a worker thread (see chat_endpoint); _call_gemini enforces its own time budget
+    result = _call_gemini(prompt)
+    if result and result.strip():
+        return result.strip()
 
     # Dynamic fallback
     lower_msg = user_msg.lower().strip()
@@ -971,7 +1022,12 @@ async def chat_endpoint(request: ChatRequest, current_user: Optional[UserDB] = D
             db.commit()
 
     # 3. Generate AI Response
-    reply_text = await asyncio.to_thread(generate_ai_response, clean_message, nlp_res)
+    history = None
+    if current_user:
+        recent = db.query(ChatMessageDB).filter(ChatMessageDB.user_id == current_user.id)             .order_by(ChatMessageDB.timestamp.desc()).limit(11).all()
+        # Skip the message we just stored; keep the 10 before it in chronological order
+        history = [{"sender": m.sender, "text": m.message} for m in reversed(recent[1:])]
+    reply_text = await asyncio.to_thread(generate_ai_response, clean_message, nlp_res, history)
 
     # 4. Store AI Chat Message in DB if authenticated
     if current_user:
@@ -1775,7 +1831,7 @@ In 4-6 short sentences: suggest which type of professional fits (counsellor, cli
 Do not invent names, phone numbers or addresses of specific doctors or clinics. Do not diagnose."""
         reply = None
         try:
-            reply = await asyncio.wait_for(asyncio.to_thread(_call_gemini, prompt), timeout=15)
+            reply = await asyncio.to_thread(_call_gemini, prompt)
         except Exception as err:
             print(f"Doctor finder AI warning: {err}")
         if not reply:

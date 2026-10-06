@@ -20,6 +20,7 @@ import CrisisHelpFeature from "./components/feature-files/crisis-help-feature";
 import FindingNearestDoctorFeature from "./components/feature-files/finding-nearest-doctor-feature";
 import AdminDashboardFeature from "./components/feature-files/admin-dashboard-feature";
 import MoodDashboard from "./components/MoodDashboard";
+import ProfilePage from "./components/ProfilePage";
 import Navbar from "./components/Navbar";
 import "./App.css";
 
@@ -292,6 +293,18 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+
+        {["/profile", "/preferences"].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+        ))}
 
         {/* Admin Only Routes */}
         <Route

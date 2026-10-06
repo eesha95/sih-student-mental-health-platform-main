@@ -104,6 +104,15 @@ const AIChatFeature = () => {
         body: JSON.stringify({ message: userText }),
       });
 
+      if (response.status === 401) {
+        setMessages((prev) => [...prev, {
+          id: Date.now() + 1,
+          sender: 'ai',
+          text: "Your login has expired, so this conversation can't be saved. Please log out and log in again. If you need urgent help, call Tele-MANAS at 14416.",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`Server error (${response.status})`);
       }
@@ -322,7 +331,7 @@ const AIChatFeature = () => {
           This AI assistant provides general wellbeing guidance and emotional support. It does not replace professional therapy or medical diagnosis.
         </p>
         <p className="text-blue-700 font-medium pt-1">
-          Emergency Crisis Contacts: India Helpline (9152987821) | AASRA (91-9820466726) | Emergency Services (112)
+          Emergency Crisis Contacts: iCall (9152987821) | AASRA (91-9820466726) | Emergency Services (112)
         </p>
       </div>
     </FeatureViewer>

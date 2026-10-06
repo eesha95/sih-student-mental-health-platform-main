@@ -59,6 +59,60 @@ class TestAuthAndProfile(unittest.TestCase):
         self.assertNotIn("password_hash", res.json())
 
 
+class TestAccountSelfService(unittest.TestCase):
+    def test_change_password(self):
+        headers, user = register("Pw")
+        bad = client.post("/me/password", json={"current_password": "wrong", "new_password": "NewPass1!"}, headers=headers)
+        self.assertEqual(bad.status_code, 400)
+        ok = client.post("/me/password", json={"current_password": "Password1!", "new_password": "NewPass1!"}, headers=headers)
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(client.post("/login", json={"email": user["email"], "password": "Password1!"}).status_code, 401)
+        self.assertEqual(client.post("/login", json={"email": user["email"], "password": "NewPass1!"}).status_code, 200)
+
+    def test_delete_own_account(self):
+        headers, user = register("Leaver")
+        client.post("/api/wellness-checks", json={"responses": WELLNESS_GOOD}, headers=headers)
+        self.assertEqual(client.request("DELETE", "/me", json={"password": "wrong"}, headers=headers).status_code, 400)
+        self.assertEqual(client.request("DELETE", "/me", json={"password": "Password1!"}, headers=headers).status_code, 200)
+        self.assertEqual(client.post("/login", json={"email": user["email"], "password": "Password1!"}).status_code, 401)
+        self.assertEqual(main.SessionLocal().query(main.WellnessCheckDB).filter_by(user_id=user["id"]).count(), 0)
+
+    def test_login_email_case_insensitive(self):
+        _, user = register("CaseUser")
+        self.assertEqual(client.post("/login", json={"email": user["email"].upper(), "password": "Password1!"}).status_code, 200)
+
+
+class TestStudentDashboard(unittest.TestCase):
+    def test_stats_are_real(self):
+        headers, _ = register("Stats")
+        empty = client.get("/dashboard", headers=headers).json()
+        self.assertEqual(empty["stats"]["days_active_30d"], 0)
+        self.assertIsNone(empty["stats"]["latest_wellness_score"])
+        self.assertIsNone(empty["latest_mood"])
+        client.post("/api/mood", json={"mood": "Good", "mood_score": 4, "emotion": "Calm", "stress_level": 2}, headers=headers)
+        client.post("/api/wellness-checks", json={"responses": WELLNESS_GOOD}, headers=headers)
+        data = client.get("/dashboard", headers=headers).json()
+        self.assertEqual(data["stats"]["days_active_30d"], 1)
+        self.assertEqual(data["stats"]["checkins_this_week"], 2)
+        self.assertGreaterEqual(data["stats"]["latest_wellness_score"], 4.5)
+        self.assertEqual(data["latest_mood"]["mood_score"], 4)
+
+
+class TestChatMemory(unittest.TestCase):
+    def test_prompt_includes_earlier_messages(self):
+        headers, _ = register("Memory")
+        prompts = []
+        original = main._call_gemini
+        main._call_gemini = lambda prompt: prompts.append(prompt) or "ok"
+        try:
+            client.post("/api/chat", json={"message": "My name is Arjun and I study physics"}, headers=headers)
+            client.post("/api/chat", json={"message": "What do I study?"}, headers=headers)
+        finally:
+            main._call_gemini = original
+        self.assertIn("Arjun", prompts[-1])
+        self.assertIn("What do I study?", prompts[-1])
+
+
 class TestBookings(unittest.TestCase):
     def test_booking_lifecycle(self):
         headers, _ = register("Ravi")
