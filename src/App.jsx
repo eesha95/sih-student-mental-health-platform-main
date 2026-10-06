@@ -25,7 +25,7 @@ import "./App.css";
 
 // Protected Route Component for regular users
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading } = useAuth();
 
   console.log("ProtectedRoute check:", {
     isAuthenticated: isAuthenticated(),
@@ -44,6 +44,11 @@ const ProtectedRoute = ({ children }) => {
   if (!isAuthenticated()) {
     console.log("Not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
+  }
+
+  // Student features need a student login; an admin token is rejected by those APIs
+  if (isAdmin()) {
+    return <Navigate to="/admin-dashboard" replace />;
   }
 
   return children;
