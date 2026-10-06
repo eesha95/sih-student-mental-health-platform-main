@@ -1,0 +1,30 @@
+# Environment variables (contain API keys and JWT secrets)
+.env
+backend/.env
+.env.*
+!.env.example
+
+# Databases with real user data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Dependencies and virtual environments
+node_modules/
+backend/venv/
+backend/myenv/
+backend/.venv/
+venv/
+.venv/
+
+# Build output and caches
+dist/
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
