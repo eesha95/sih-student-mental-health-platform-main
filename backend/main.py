@@ -1898,18 +1898,14 @@ async def doctor_finder(req: DoctorFinderRequest, current_user: UserDB = Depends
     if nlp["risk_level"] in ("HIGH", "CRITICAL"):
         reply = generate_ai_response(message, nlp)
     else:
-        prompt = f"""A university student in India is looking for a mental health professional. Their message: "{message}". Location: "{req.location or 'not given'}".
-In 4-6 short sentences: suggest which type of professional fits (counsellor, clinical psychologist, or psychiatrist) and why, what to ask when calling, and remind them that their campus counselling cell and Tele-MANAS (14416) are free options.
-Do not invent names, phone numbers or addresses of specific doctors or clinics. Do not diagnose."""
-        reply = None
-        try:
-            reply = await asyncio.to_thread(_call_gemini, prompt)
-        except Exception as err:
-            print(f"Doctor finder AI warning: {err}")
-        if not reply:
-            reply = (f"For what you've described, a {specialist} is a good place to start. "
-                     "Use the map searches below to find clinics near you, and check reviews and registration before visiting. "
-                     "You can also book a free session with a campus counsellor here, or call Tele-MANAS at 14416 for free tele-counselling.")
+        # Built-in guidance (Gemini is reserved for the AI support chat)
+        why = ("A psychiatrist can assess whether medication would help and prescribe it if needed. "
+               if needs_psychiatrist else
+               "A psychologist or counsellor can help with talking therapy and practical coping skills. ")
+        reply = (f"For what you've described, a {specialist} is a good place to start. {why}"
+                 "Use the map searches below to find clinics near you, and check reviews and registration before visiting. "
+                 "When you call, ask whether they work with students, what a session costs, and how soon you can be seen. "
+                 "You can also book a free session with a campus counsellor here, or call Tele-MANAS at 14416 for free tele-counselling.")
     return {"source": "guidance", "doctors": [], "reply": reply.strip(), "search_links": search_links, "risk_level": nlp["risk_level"]}
 
 # --- ADMIN ANALYTICS, SAFETY & EXPORT ---
