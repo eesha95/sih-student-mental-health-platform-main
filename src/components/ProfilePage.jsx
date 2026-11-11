@@ -30,7 +30,6 @@ const ProfilePage = () => {
   const [passwordMessage, setPasswordMessage] = useState(null);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteMessage, setDeleteMessage] = useState(null);
 
@@ -67,17 +66,6 @@ const ProfilePage = () => {
       setPasswordMessage({ ok: false, text: err.message });
     } finally {
       setSavingPassword(false);
-    }
-  };
-
-  const toggleTheme = () => {
-    const next = !isDarkMode;
-    setIsDarkMode(next);
-    document.documentElement.classList.toggle('dark', next);
-    try {
-      localStorage.setItem('theme', next ? 'dark' : 'light');
-    } catch {
-      // storage unavailable; theme applies for this session only
     }
   };
 
@@ -145,13 +133,6 @@ const ProfilePage = () => {
 
         <Section id="preferences" title="Preferences">
           <div className="space-y-4">
-            <label className="flex items-center justify-between gap-4 cursor-pointer">
-              <div>
-                <span className="font-medium text-gray-700">Dark mode</span>
-                <p className="text-sm text-gray-500">Easier on the eyes at night</p>
-              </div>
-              <input type="checkbox" className="h-5 w-5" checked={isDarkMode} onChange={toggleTheme} />
-            </label>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <span className="font-medium text-gray-700">Notifications</span>

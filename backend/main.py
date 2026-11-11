@@ -15,12 +15,23 @@ import os
 import asyncio
 import bcrypt
 import concurrent.futures
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 import dataset_analytics
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Gemini is used only by the AI support chat (see _call_gemini)
+_gemini_client = None
+
+def _get_gemini_client():
+    global _gemini_client
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not key:
+        return None
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=key)
+    return _gemini_client
 
 app = FastAPI(
     title="Student Mental Health API",
@@ -559,7 +570,8 @@ def register_user(user: UserCreate, request: Request, db: Session = Depends(get_
         id=str(uuid.uuid4()),
         name=user.name,
         email=user.email.lower(),
-        password_hash=hashed_password
+        password_hash=hashed_password,
+        last_login=datetime.utcnow(),  # signing up also logs the student in
     )
     db.add(new_user)
     db.commit()
@@ -896,14 +908,24 @@ GEMINI_MODELS = [m.strip() for m in os.getenv(
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "25"))
 
 def _call_gemini(prompt: str) -> Optional[str]:
+    """Ask Gemini for a chat reply, trying each model in GEMINI_MODELS within one time budget."""
     import time
+    client = _get_gemini_client()
+    if client is None:
+        return None  # no key configured: use the built-in replies right away
     deadline = time.monotonic() + GEMINI_TIMEOUT_SECONDS
     for model_name in GEMINI_MODELS:
         remaining = deadline - time.monotonic()
         if remaining < 2:
             break
         try:
-            res = genai.GenerativeModel(model_name).generate_content(prompt, request_options={"timeout": remaining})
+            res = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    http_options=genai_types.HttpOptions(timeout=int(remaining * 1000)),  # milliseconds
+                ),
+            )
             if res and getattr(res, "text", None):
                 return res.text
         except Exception as err:
@@ -1068,7 +1090,7 @@ async def chat_endpoint(request: ChatRequest, current_user: Optional[UserDB] = D
     return {
         "reply": reply_text,
         "nlp": nlp_res,
-        "timestamp": datetime.utcnow().strftime("%H:%M")
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 @app.get("/api/chat/history")
@@ -1080,7 +1102,7 @@ def get_chat_history(current_user: UserDB = Depends(get_current_user), db: Sessi
             "sender": msg.sender,
             "text": msg.message,
             "risk_level": msg.risk_level,
-            "timestamp": msg.timestamp.strftime("%I:%M %p")
+            "timestamp": msg.timestamp.isoformat() + "Z"
         } for msg in messages
     ]
 
@@ -1245,12 +1267,31 @@ def generate_dynamic_recommendations(user_id: str, db: Session):
             reason="Maintains positive psychological momentum.", duration_minutes=5
         ))
 
+    # Don't repeat a suggestion the student already has open
+    open_titles = {t for (t,) in db.query(RecommendationDB.title).filter(
+        RecommendationDB.user_id == user_id, RecommendationDB.is_completed == False).all()}
     for rec in new_recs:
-        db.add(rec)
+        if rec.title not in open_titles:
+            open_titles.add(rec.title)
+            db.add(rec)
     db.commit()
+
+def _remove_duplicate_open_recommendations(user_id: str, db: Session):
+    """Older versions added the same open suggestion on every mood entry; keep only the newest copy."""
+    seen = set()
+    removed = False
+    for rec in db.query(RecommendationDB).filter(RecommendationDB.user_id == user_id, RecommendationDB.is_completed == False)             .order_by(RecommendationDB.created_at.desc()).all():
+        if rec.title in seen:
+            db.delete(rec)
+            removed = True
+        else:
+            seen.add(rec.title)
+    if removed:
+        db.commit()
 
 @app.get("/api/recommendations")
 def get_user_recommendations(current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    _remove_duplicate_open_recommendations(current_user.id, db)
     recs = db.query(RecommendationDB).filter(RecommendationDB.user_id == current_user.id).order_by(RecommendationDB.created_at.desc()).all()
     if not recs:
         generate_dynamic_recommendations(current_user.id, db)
@@ -1776,6 +1817,13 @@ def admin_moderate_post(post_id: str, action: str, current_admin: AdminDB = Depe
 
 # --- NOTIFICATIONS ---
 
+def _pretty_date(iso_date: str) -> str:
+    """'2026-11-12' -> 'Thu 12 Nov', matching the live-session reminders."""
+    try:
+        return datetime.strptime(iso_date, "%Y-%m-%d").strftime("%a %d %b")
+    except (TypeError, ValueError):
+        return iso_date
+
 @app.get("/api/notifications")
 def get_notifications(current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.utcnow()
@@ -1785,10 +1833,10 @@ def get_notifications(current_user: UserDB = Depends(get_current_user), db: Sess
     for b in db.query(BookingDB).filter(BookingDB.user_id == current_user.id, BookingDB.date >= today, BookingDB.status.in_(["pending", "confirmed"])).all():
         label = "confirmed" if b.status == "confirmed" else "awaiting confirmation"
         items.append({"id": f"booking-{b.id}-{b.status}", "type": "appointment", "link": "/booking", "created_at": b.updated_at or b.created_at,
-                      "message": f"Session with {b.counselor_name} on {b.date} at {b.time_slot} ({label})"})
+                      "message": f"Session with {b.counselor_name} on {_pretty_date(b.date)} at {b.time_slot} ({label})"})
     for b in db.query(BookingDB).filter(BookingDB.user_id == current_user.id, BookingDB.status == "cancelled", BookingDB.updated_at >= now - timedelta(days=7)).all():
         items.append({"id": f"booking-{b.id}-cancelled", "type": "appointment", "link": "/booking", "created_at": b.updated_at,
-                      "message": f"Your session with {b.counselor_name} on {b.date} was cancelled"})
+                      "message": f"Your session with {b.counselor_name} on {_pretty_date(b.date)} was cancelled"})
 
     my_post_ids = [p.id for p in db.query(PeerPostDB.id).filter(PeerPostDB.user_id == current_user.id).all()]
     if my_post_ids:

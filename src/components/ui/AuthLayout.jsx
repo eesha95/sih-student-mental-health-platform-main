@@ -43,6 +43,7 @@ export const AuthField = ({ icon: Icon, type = 'text', ...props }) => {
     <label className="flex items-center gap-3 rounded-xl border border-brand-100 bg-white px-4 py-3 transition focus-within:border-brand-400 focus-within:ring-4 focus-within:ring-brand-100">
       {Icon && <Icon className="h-4 w-4 shrink-0 text-brand-400" />}
       <input
+        aria-label={props['aria-label'] || props.placeholder}
         type={isPassword && show ? 'text' : type}
         className="w-full bg-transparent text-sm text-brand-950 placeholder:text-brand-300 outline-none disabled:opacity-60"
         {...props}

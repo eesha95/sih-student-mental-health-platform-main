@@ -2,6 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import FeatureViewer from '../FeatureViewer';
 import { useAuth } from '../../context/AuthContext';
 
+// Server times are ISO strings in UTC; show them in the student's local time
+const formatTime = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? ts : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 const AIChatFeature = () => {
@@ -245,7 +252,7 @@ const AIChatFeature = () => {
                     msg.sender === 'user' ? 'text-blue-200' : 'text-gray-400'
                   }`}
                 >
-                  {msg.timestamp}
+                  {formatTime(msg.timestamp)}
                 </span>
               </div>
 

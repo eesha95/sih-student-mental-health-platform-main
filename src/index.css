@@ -47,6 +47,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Keep focused / scrolled-to elements clear of the sticky top bar */
+  scroll-padding-top: 5rem;
 }
 
 body {
