@@ -898,12 +898,13 @@ def analyze_nlp_and_safety(text: str) -> dict:
         "recommended_action": recommended_action
     }
 
-# Fast "lite" models first: larger flash models can take 10-45s to answer, which made chat time out.
+# Fast "lite" models first (measured Nov 2026: 3.1-flash-lite and flash-lite-latest answer in ~1-2 s,
+# 3.5-flash-lite in ~12 s; 2.5-flash-lite returns 404 for new keys and flash-latest timed out).
 # Free-tier quota is counted per model per day, so falling back across models keeps chat working longer.
 # Override with GEMINI_MODELS="models/a,models/b" in .env.
 GEMINI_MODELS = [m.strip() for m in os.getenv(
     "GEMINI_MODELS",
-    "models/gemini-flash-lite-latest,models/gemini-3.5-flash-lite,models/gemini-2.5-flash-lite,models/gemini-flash-latest",
+    "models/gemini-3.1-flash-lite,models/gemini-flash-lite-latest,models/gemini-3.5-flash-lite",
 ).split(",") if m.strip()]
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "25"))
 
@@ -962,6 +963,7 @@ Rules:
 - If the user greets you (e.g. "hii", "hello", "hey"), greet them warmly and ask how their day is going or how you can assist them today.
 - Offer actionable, realistic coping strategies when appropriate (e.g., 4-7-8 breathing, pomodoro breaks, sleep routines).
 - Keep answers conversational, helpful, and naturally structured.
+- Keep it short, like a chat message: about 60-120 words, unless the student asks for more detail.
 
 Detected User State: Emotion={nlp_res['emotion']}, Sentiment={nlp_res['sentiment']}, Stress={nlp_res['stress_level']}.
 {_format_history(history)}User message: {user_msg}
