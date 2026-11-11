@@ -1,5 +1,6 @@
 // Split-panel layout shared by the student login, signup and admin login pages.
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { CalmCup, LotusLogo } from './Brand';
 
@@ -8,8 +9,10 @@ export const AuthLayout = ({ heading, subheading, children }) => (
     <div className="mc-fade-up grid w-full max-w-4xl overflow-hidden rounded-[1.75rem] bg-white shadow-[0_30px_80px_-30px_rgba(58,37,102,0.35)] md:grid-cols-2">
       {/* Illustration panel */}
       <div className="relative hidden flex-col items-center overflow-hidden bg-gradient-to-b from-[#e9defc] via-[#dccbf6] to-[#cdb6ee] px-8 pt-10 pb-0 text-center md:flex">
-        <LotusLogo className="h-11 w-14" />
-        <span className="mt-1 text-lg font-semibold text-brand-900">MindCare</span>
+        <Link to="/" className="flex flex-col items-center" aria-label="MindCare home">
+          <LotusLogo className="h-11 w-14" />
+          <span className="mt-1 text-lg font-semibold text-brand-900">MindCare</span>
+        </Link>
         <h2 className="mt-10 text-3xl font-semibold leading-tight text-brand-950" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
           A Healthier Mind
           <br />A Happier You
@@ -21,10 +24,10 @@ export const AuthLayout = ({ heading, subheading, children }) => (
 
       {/* Form panel */}
       <div className="px-6 py-10 sm:px-10">
-        <div className="mb-6 flex flex-col items-center md:hidden">
+        <Link to="/" className="mb-6 flex flex-col items-center md:hidden" aria-label="MindCare home">
           <LotusLogo className="h-10 w-12" />
           <span className="text-base font-semibold text-brand-900">MindCare</span>
-        </div>
+        </Link>
         <h1 className="text-center text-2xl font-semibold text-brand-950">{heading}</h1>
         {subheading && <p className="mx-auto mt-2 max-w-xs text-center text-sm text-brand-500">{subheading}</p>}
         <div className="mt-7">{children}</div>

@@ -7,6 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import Landing from "./components/Landing";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import AdminLogin from "./components/AdminLogin";
@@ -319,10 +320,7 @@ function AppContent() {
           path="/"
           element={(() => {
             if (!isAuthenticated()) {
-              console.log(
-                "Root route: Not authenticated, redirecting to login"
-              );
-              return <Navigate to="/login" replace />;
+              return <Landing />;
             } else if (isAdmin()) {
               console.log(
                 "Root route: Admin user, redirecting to admin dashboard"
@@ -340,7 +338,7 @@ function AppContent() {
           path="*"
           element={(() => {
             if (!isAuthenticated()) {
-              return <Navigate to="/login" replace />;
+              return <Navigate to="/" replace />;
             } else if (isAdmin()) {
               return <Navigate to="/admin-dashboard" replace />;
             } else {
