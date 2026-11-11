@@ -1,8 +1,18 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+  "services": {
+    "frontend": {
+      "root": ".",
+      "framework": "vite",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+    },
+    "backend": {
+      "root": "backend",
+      "entrypoint": "main:app",
+      "rewrites": [{ "source": "/backend/:path(.*)?", "destination": "/:path" }]
     }
+  },
+  "rewrites": [
+    { "source": "/backend/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]
 }

@@ -3,6 +3,7 @@
 backend/.env
 .env.*
 !.env.example
+!.env.production
 
 # Databases with real user data
 *.db
@@ -28,3 +29,8 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+.vercel
+.env*
+!.env.example
+!.env.production

@@ -14,3 +14,4 @@ python-dotenv==1.0.1
 google-generativeai
 # Testing
 httpx
+psycopg2-binary==2.9.10

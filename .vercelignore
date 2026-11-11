@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+backend/.venv
+backend/venv
+backend/__pycache__
+*.db
+*.db-journal

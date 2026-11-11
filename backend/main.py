@@ -16,6 +16,7 @@ import asyncio
 import bcrypt
 import concurrent.futures
 import google.generativeai as genai
+import dataset_analytics
 
 load_dotenv()
 
@@ -34,7 +35,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 24 * 60  # 24 hours
 
 # Database Configuration
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./users.db")
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {})
+# Hosted Postgres (e.g. Neon on Vercel) hands out postgres:// URLs; SQLAlchemy needs postgresql+psycopg2://
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://" + SQLALCHEMY_DATABASE_URL[len("postgres://"):]
+elif SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://" + SQLALCHEMY_DATABASE_URL[len("postgresql://"):]
+if "sqlite" in SQLALCHEMY_DATABASE_URL:
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    # pre_ping drops connections the serverless database closed while idle
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -268,6 +278,18 @@ class AppSettingDB(Base):
 
     key = Column(String, primary_key=True, index=True)
     value = Column(String)
+
+class DatasetDB(Base):
+    """An uploaded survey dataset (CSV) for the admin analytics panel."""
+    __tablename__ = "datasets"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String)
+    record_count = Column(Integer)
+    columns = Column(Text)  # JSON: column key -> original header
+    rows = Column(Text)  # JSON: parsed numeric rows
+    uploaded_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -1892,6 +1914,83 @@ def admin_analytics(current_admin: AdminDB = Depends(get_current_admin), db: Ses
         "stress": as_list(stress, ["High stress", "Moderate stress", "Low stress"]),
         "trend": trend,
     }
+
+# --- ADMIN DATASET ANALYTICS ---
+
+class DatasetUploadRequest(BaseModel):
+    filename: str
+    content: str
+
+class DatasetPredictRequest(BaseModel):
+    features: dict
+
+def _dataset_or_404(db: Session, dataset_id: str) -> "DatasetDB":
+    query = db.query(DatasetDB)
+    dataset = (query.order_by(DatasetDB.created_at.desc()).first() if dataset_id == "latest"
+               else query.filter(DatasetDB.id == dataset_id).first())
+    if not dataset:
+        raise HTTPException(status_code=404, detail="No dataset found. Upload a CSV first.")
+    return dataset
+
+def _dataset_summary(d: "DatasetDB") -> dict:
+    return {"id": d.id, "name": d.name, "record_count": d.record_count, "created_at": d.created_at}
+
+def _dataset_analysis(d: "DatasetDB") -> dict:
+    result = dataset_analytics.analyze(json.loads(d.columns), json.loads(d.rows))
+    if result["prediction"]:
+        result["prediction"].pop("model", None)
+    return {"dataset": _dataset_summary(d), **result}
+
+@app.get("/admin/datasets")
+def list_datasets(current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return [_dataset_summary(d) for d in db.query(DatasetDB).order_by(DatasetDB.created_at.desc()).all()]
+
+@app.post("/admin/datasets")
+def upload_dataset(req: DatasetUploadRequest, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if len(req.content) > 4_000_000:
+        raise HTTPException(status_code=413, detail="The file is too large (limit about 4 MB).")
+    try:
+        columns, rows = dataset_analytics.parse_csv(req.content)
+    except dataset_analytics.DatasetError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    dataset = DatasetDB(
+        id=str(uuid.uuid4()), name=(req.filename or "dataset.csv")[:200], record_count=len(rows),
+        columns=json.dumps(columns), rows=json.dumps(rows), uploaded_by=current_admin.email,
+    )
+    db.add(dataset)
+    db.commit()
+    db.refresh(dataset)
+    log_activity(db, None, current_admin.name, "dataset_upload", f"Admin uploaded dataset {dataset.name} ({len(rows)} records)")
+    return _dataset_analysis(dataset)
+
+@app.get("/admin/datasets/{dataset_id}/analysis")
+def dataset_analysis(dataset_id: str, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return _dataset_analysis(_dataset_or_404(db, dataset_id))
+
+@app.post("/admin/datasets/{dataset_id}/predict")
+def dataset_predict(dataset_id: str, req: DatasetPredictRequest, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
+    d = _dataset_or_404(db, dataset_id)
+    columns, rows = json.loads(d.columns), json.loads(d.rows)
+    analysis = dataset_analytics.analyze(columns, rows)
+    if not analysis["prediction"]:
+        raise HTTPException(status_code=400, detail="This dataset has no factor columns to predict from.")
+    features = {}
+    for f in analysis["prediction"]["features"]:
+        value = req.features.get(f["key"])
+        if value is not None:
+            try:
+                features[f["key"]] = float(value)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail=f"{f['label']} must be a number")
+    proba = dataset_analytics.predict_proba(analysis["prediction"]["model"], features)
+    return {"predicted_level": max(proba, key=proba.get), "probabilities": proba}
+
+@app.delete("/admin/datasets/{dataset_id}")
+def delete_dataset(dataset_id: str, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):
+    d = _dataset_or_404(db, dataset_id)
+    db.delete(d)
+    db.commit()
+    return {"message": "Dataset deleted"}
 
 @app.get("/admin/safety-alerts")
 def admin_safety_alerts(days: int = 7, current_admin: AdminDB = Depends(get_current_admin), db: Session = Depends(get_db)):

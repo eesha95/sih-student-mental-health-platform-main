@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Users, Smile, CalendarCheck, ChartColumn, ShieldCheck, Download } from 'lucide-react';
 import { MindHeart } from '../ui/Brand';
+import DatasetAnalytics from './DatasetAnalytics';
 import { useAuth } from '../../context/AuthContext';
 import FeatureViewer from '../FeatureViewer';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -699,6 +700,8 @@ const AdminDashboardFeature = () => {
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
+          <DatasetAnalytics />
+          <hr className="border-brand-100" />
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Student Wellbeing (anonymous)</h3>
             <p className="text-sm text-gray-600">
