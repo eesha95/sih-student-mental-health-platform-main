@@ -1,33 +1,108 @@
 @import "tailwindcss";
 
-/* Custom scrollbar for code blocks */
-.overflow-x-auto::-webkit-scrollbar {
-  height: 6px;
+/*
+ * MindCare theme.
+ * Feature pages were written with blue/indigo utility classes. Remapping those
+ * scales to the lavender brand palette re-themes every page in one place.
+ */
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #f7f4fe;
+  --color-brand-100: #efe9fc;
+  --color-brand-200: #ddd2f7;
+  --color-brand-300: #c4b0ef;
+  --color-brand-400: #a78be3;
+  --color-brand-500: #8b6ad6;
+  --color-brand-600: #7352c3;
+  --color-brand-700: #5e3fa6;
+  --color-brand-800: #4a3185;
+  --color-brand-900: #392566;
+  --color-brand-950: #24173f;
+
+  --color-blue-50: #f7f4fe;
+  --color-blue-100: #efe9fc;
+  --color-blue-200: #ddd2f7;
+  --color-blue-300: #c4b0ef;
+  --color-blue-400: #a78be3;
+  --color-blue-500: #8b6ad6;
+  --color-blue-600: #7352c3;
+  --color-blue-700: #5e3fa6;
+  --color-blue-800: #4a3185;
+  --color-blue-900: #392566;
+  --color-blue-950: #24173f;
+
+  --color-indigo-50: #f7f4fe;
+  --color-indigo-100: #efe9fc;
+  --color-indigo-200: #ddd2f7;
+  --color-indigo-300: #c4b0ef;
+  --color-indigo-400: #a78be3;
+  --color-indigo-500: #8b6ad6;
+  --color-indigo-600: #7352c3;
+  --color-indigo-700: #5e3fa6;
+  --color-indigo-800: #4a3185;
+  --color-indigo-900: #392566;
+  --color-indigo-950: #24173f;
 }
 
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: #374151;
+html {
+  scroll-behavior: smooth;
 }
 
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #6b7280;
+body {
+  background: #f4f1fb;
+  color: #2a1f45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Soft card used across the shell */
+.mc-card {
+  background: #ffffff;
+  border: 1px solid #ece6fb;
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 2px rgba(58, 37, 102, 0.04), 0 8px 24px -12px rgba(58, 37, 102, 0.12);
+}
+
+.mc-sidebar {
+  background: linear-gradient(180deg, #4a3185 0%, #3a2768 55%, #2e1f54 100%);
+}
+
+/* Thin scrollbars */
+.mc-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.mc-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #efe9fc;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #c4b0ef;
+  border-radius: 3px;
 }
 
-/* Animation classes */
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+@keyframes mc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
-  50% {
-    opacity: .5;
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.mc-fade-up {
+  animation: mc-fade-up 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-fade-up {
+    animation: none;
   }
 }

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ArrowRight, Users, Smile, CalendarCheck, ChartColumn, ShieldCheck, Download } from 'lucide-react';
+import { MindHeart } from '../ui/Brand';
 import { useAuth } from '../../context/AuthContext';
 import FeatureViewer from '../FeatureViewer';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -90,7 +93,10 @@ const DistributionChart = ({ title, data, colors }) => {
 
 const AdminDashboardFeature = () => {
   const { adminActions, getAdminDashboardData, isAdmin, apiRequest, token } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  // The active tab lives in the URL so the sidebar links can open each section
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'overview';
+  const setActiveTab = (tab) => setSearchParams(tab === 'overview' ? {} : { tab });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -144,6 +150,7 @@ const AdminDashboardFeature = () => {
       setSettings(currentSettings);
       setSafetyAlerts(alerts);
     });
+    await safely(async () => setAnalytics(await apiRequest('/admin/analytics')));
     try {
       const res = await fetch(`${API_BASE_URL}/health`);
       setHealth(await res.json());
@@ -262,7 +269,7 @@ const AdminDashboardFeature = () => {
 
   if (!isAdmin()) {
     return (
-      <FeatureViewer title="Admin Dashboard">
+      <FeatureViewer title="Admin Dashboard" showBackButton={false}>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
           <p className="text-gray-600">You need admin privileges to access this dashboard.</p>
@@ -273,7 +280,7 @@ const AdminDashboardFeature = () => {
 
   if (loading && activeTab === 'overview') {
     return (
-      <FeatureViewer title="Admin Dashboard">
+      <FeatureViewer title="Admin Dashboard" showBackButton={false}>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading admin dashboard...</p>
@@ -294,12 +301,99 @@ const AdminDashboardFeature = () => {
   ];
 
   return (
-    <FeatureViewer title="Admin Dashboard">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-600 mt-2">Manage users, bookings and community safety, and see anonymous wellbeing trends</p>
-      </div>
+    <FeatureViewer title={activeTab === 'overview' ? null : 'Admin Dashboard'} showBackButton={false} bare>
+      {activeTab === 'overview' && dashboardData && (() => {
+        const scored = (analytics?.trend || []).filter((d) => d.avg_score != null);
+        const avgScore = scored.length ? scored.reduce((sum, d) => sum + d.avg_score, 0) / scored.length : null;
+        const quick = [
+          { label: 'Manage Bookings', icon: CalendarCheck, onClick: () => setActiveTab('bookings'), badge: dashboardData.pending_bookings },
+          { label: 'View Analytics', icon: ChartColumn, onClick: () => setActiveTab('analytics') },
+          { label: 'Manage Users', icon: Users, onClick: () => setActiveTab('users') },
+          { label: 'Crisis & Moderation', icon: ShieldCheck, onClick: () => setActiveTab('moderation'), badge: dashboardData.posts_needing_review },
+          { label: exporting ? 'Exporting...' : 'Export Reports', icon: Download, onClick: exportData }
+        ];
+        return (
+          <div className="mb-5 space-y-5">
+            <div className="grid gap-5 lg:grid-cols-4">
+              <section className="mc-fade-up relative overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-[#efe7ff] via-[#e6dbfb] to-[#d9c9f6] p-6 sm:p-8 lg:col-span-2">
+                <div className="relative z-10 max-w-xs">
+                  <h1 className="text-2xl font-semibold text-brand-950 sm:text-3xl">Welcome Back, Admin!</h1>
+                  <p className="mt-2 text-sm text-brand-800">Together, we can make mental wellness a priority for every student.</p>
+                  <button
+                    onClick={() => setActiveTab('analytics')}
+                    className="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-brand-900/20 hover:bg-brand-800"
+                  >
+                    View Analytics <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+                <MindHeart className="pointer-events-none absolute -bottom-2 right-0 hidden h-44 w-52 sm:block" />
+              </section>
+              <section className="mc-card mc-fade-up p-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-100 text-brand-700"><Users className="h-5 w-5" /></span>
+                <div className="mt-4 text-3xl font-bold text-brand-950">{dashboardData.total_users.toLocaleString()}</div>
+                <div className="text-sm text-brand-500">Total Students</div>
+                <div className="mt-2 inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{dashboardData.active_users} active</div>
+              </section>
+              <section className="mc-card mc-fade-up bg-gradient-to-b from-white to-emerald-50/60 p-6">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><Smile className="h-5 w-5" /></span>
+                <div className="mt-4 text-3xl font-bold text-brand-950">{avgScore == null ? '—' : `${Math.round((avgScore / 5) * 100)}%`}</div>
+                <div className="text-sm text-brand-500">Avg Wellness Score</div>
+                <div className="mt-2 inline-flex rounded-full bg-emerald-100/70 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  {avgScore == null ? 'No check-ins in 14 days' : `${avgScore.toFixed(1)}/5 · last 14 days`}
+                </div>
+              </section>
+            </div>
 
+            <section className="mc-card mc-fade-up p-6">
+              <h2 className="mb-4 text-base font-semibold text-brand-950">Quick Access</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {quick.map(({ label, icon, onClick, badge }) => {
+                  const Icon = icon;
+                  return (
+                  <button
+                    key={label}
+                    onClick={onClick}
+                    className="relative flex flex-col items-center gap-2 rounded-2xl border border-brand-50 bg-brand-50/50 px-3 py-5 text-sm font-medium text-brand-900 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+                  >
+                    <Icon className="h-6 w-6 text-brand-600" />
+                    {label}
+                    {badge > 0 && <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{badge}</span>}
+                  </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="mc-card mc-fade-up p-6">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-base font-semibold text-brand-950">
+                  <ChartColumn className="h-5 w-5 text-brand-600" /> Support Overview
+                </h2>
+                <span className="rounded-full border border-brand-100 px-3 py-1 text-xs text-brand-500">Check-ins · last 14 days</span>
+              </div>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analytics?.trend || []} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="adminFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor="#8b6ad6" stopOpacity={0.3} />
+                        <stop offset="1" stopColor="#8b6ad6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="#efe9fc" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8b78b8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#b4a6d6' }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v) => [v, 'Wellness check-ins']} contentStyle={{ borderRadius: 12, border: '1px solid #ece6fb', fontSize: 12 }} />
+                    <Area type="monotone" dataKey="checkins" stroke="#7352c3" strokeWidth={2.5} fill="url(#adminFill)" dot={{ r: 3.5, fill: '#fff', stroke: '#7352c3', strokeWidth: 2 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
+
+      <div className="mc-card p-5 sm:p-6">
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex justify-between">
           <span>{error}</span>
@@ -309,16 +403,16 @@ const AdminDashboardFeature = () => {
       {notice && <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">{notice}</div>}
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200 mb-6 overflow-x-auto">
-        <nav className="-mb-px flex space-x-6">
+      <div className="mb-6 overflow-x-auto">
+        <nav className="flex w-max gap-2 rounded-2xl bg-brand-50/70 p-1.5">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+              className={`py-2 px-4 rounded-xl font-medium text-sm whitespace-nowrap transition-colors ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-white text-brand-800 shadow-sm'
+                  : 'text-brand-500 hover:text-brand-800'
               }`}
             >
               <span className="mr-2">{tab.icon}</span>
@@ -742,6 +836,7 @@ const AdminDashboardFeature = () => {
           </div>
         </div>
       )}
+      </div>
     </FeatureViewer>
   );
 };

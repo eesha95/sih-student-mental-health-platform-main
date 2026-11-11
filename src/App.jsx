@@ -21,8 +21,6 @@ import FindingNearestDoctorFeature from "./components/feature-files/finding-near
 import AdminDashboardFeature from "./components/feature-files/admin-dashboard-feature";
 import MoodDashboard from "./components/MoodDashboard";
 import ProfilePage from "./components/ProfilePage";
-import Navbar from "./components/Navbar";
-import "./App.css";
 
 // Protected Route Component for regular users
 const ProtectedRoute = ({ children }) => {
@@ -36,7 +34,7 @@ const ProtectedRoute = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
         <p className="ml-4 text-gray-600">Loading...</p>
       </div>
     );
@@ -68,7 +66,7 @@ const AdminProtectedRoute = ({ children }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
         <p className="ml-4 text-gray-600">Loading admin panel...</p>
       </div>
     );
@@ -112,7 +110,7 @@ const LoginRoute = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -137,7 +135,7 @@ const AdminLoginRoute = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -164,7 +162,7 @@ const SignupRoute = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -192,7 +190,7 @@ function AppContent() {
   // Show loading screen while initializing auth
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#f4f1fb]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Initializing application...</p>

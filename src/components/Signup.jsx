@@ -1,7 +1,9 @@
 // components/Signup.jsx
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { AuthLayout, AuthField, AuthError, AuthButton } from './ui/AuthLayout';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -104,123 +106,24 @@ const Signup = () => {
   };
 
   return (
-    // <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 px-4 py-6">
-    <div className="min-h-screen flex items-center justify-center px-4 py-6">
-      <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-1">Mental Health Dashboard</h2>
-          <h3 className="text-gray-600">Create Account</h3>
-        </div>
-        
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4 text-sm" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name
-            </label>
-            <input
-              id="name"
-              type="text"
-              name="name"
-              placeholder="Enter your full name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              disabled={loading}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors disabled:bg-gray-100 text-sm"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              disabled={loading}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors disabled:bg-gray-100 text-sm"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              name="password"
-              placeholder="Enter your password (min. 6 characters)"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength="6"
-              disabled={loading}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors disabled:bg-gray-100 text-sm"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              name="confirmPassword"
-              placeholder="Confirm your password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              disabled={loading}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors disabled:bg-gray-100 text-sm"
-            />
-          </div>
-          
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center mt-4"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Creating Account...
-              </>
-            ) : (
-              'Sign Up'
-            )}
-          </button>
-        </form>
-        
-        <div className="mt-4 text-center text-sm text-gray-600">
-          <p>Already have an account? <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">Login</Link></p>
-        </div>
-
-        {/* Password requirements - more compact */}
-        <div className="mt-3 p-2.5 bg-blue-50 rounded-lg text-xs text-gray-600">
-          <p className="font-medium mb-1">Password Requirements:</p>
-          <div className="space-y-0.5">
-            <p>• Minimum 6 characters</p>
-            <p>• Recommended: 8+ characters with mixed case, numbers, and symbols</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AuthLayout heading="Create Your Account" subheading="Start your journey towards better mental health">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <AuthError>{error}</AuthError>
+        <AuthField icon={UserRound} name="name" placeholder="Full Name" autoComplete="name"
+          value={formData.name} onChange={handleChange} required disabled={loading} />
+        <AuthField icon={Mail} type="email" name="email" placeholder="Email Address" autoComplete="email"
+          value={formData.email} onChange={handleChange} required disabled={loading} />
+        <AuthField icon={Lock} type="password" name="password" placeholder="Password (at least 6 characters)" autoComplete="new-password"
+          value={formData.password} onChange={handleChange} required disabled={loading} />
+        <AuthField icon={Lock} type="password" name="confirmPassword" placeholder="Confirm Password" autoComplete="new-password"
+          value={formData.confirmPassword} onChange={handleChange} required disabled={loading} />
+        <AuthButton loading={loading} loadingText="Creating account...">Sign Up</AuthButton>
+      </form>
+      <p className="mt-6 text-center text-sm text-brand-500">
+        Already have an account?{' '}
+        <Link to="/login" className="font-semibold text-brand-700 hover:text-brand-900">Login</Link>
+      </p>
+    </AuthLayout>
   );
 };
 
